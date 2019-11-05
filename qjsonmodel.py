@@ -40,6 +40,8 @@ Changes:
 import json
 
 from Qt import QtWidgets, QtCore, __binding__
+#from PySide2 import *
+#from PySide2.QtWidgets import *
 
 
 class QJsonTreeItem(object):
@@ -146,7 +148,7 @@ class QJsonModel(QtCore.QAbstractItemModel):
 
         self.beginResetModel()
 
-        self._rootItem = QJsonTreeItem.load(document)
+        self._rootItem = QJsonTreeItem.load(document,sort=False)
         self._rootItem.type = type(document)
 
         self.endResetModel()
@@ -187,6 +189,7 @@ class QJsonModel(QtCore.QAbstractItemModel):
 
     def setData(self, index, value, role):
         if role == QtCore.Qt.EditRole:
+            print("Editing... val:"+value,flush=True)
             if index.column() == 1:
                 item = index.internalPointer()
                 item.value = str(value)
@@ -197,7 +200,6 @@ class QJsonModel(QtCore.QAbstractItemModel):
                     self.dataChanged.emit(index, index, [QtCore.Qt.EditRole])
 
                 return True
-
         return False
 
     def headerData(self, section, orientation, role):
@@ -310,9 +312,15 @@ if __name__ == '__main__':
     }
     """)
 
-    model.load(document)
-    model.clear()
-    model.load(document)
+
+    with open("test.csv") as f:
+                  document = json.load(f)
+                  model.load(document)
+
+
+    #model.load(document)
+    #model.clear()
+    #model.load(document)
 
     # Sanity check
     assert (
