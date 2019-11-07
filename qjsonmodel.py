@@ -444,6 +444,14 @@ class JsonWidget(QtWidgets.QWidget):
         menu.exec_(self.treeView.viewport().mapToGlobal(position))
 
 
+    def get_item_level(self,model_inex):
+        level=0
+        parent=model_inex.parent()
+        while parent.isValid() :
+            parent=parent.parent()
+            level=level+1
+        return level
+
     def add_item(self,type):
         selected_index=self.treeView.selectedIndexes()
         if len(selected_index) <= 0:
