@@ -148,23 +148,20 @@ class QJsonTreeItem(object):
         parent.appendChild(child)
 
 
-    def add_item(self,value,key,sibling,muj_typ):
+    def add_item(self,key,value,sibling,muj_typ):
         parent=sibling.parent()
 
-        print("Pridavam, sibling type: "+str(sibling._type)+" value:"+str(sibling._value)+" key:"+str(sibling.key),flush=True)
-        print("Pridavam, parent type: "+str(parent._type)+" value:"+str(parent._value)+" key:"+str(parent.key),flush=True)
-        print("Typ je:"+str(muj_typ))
+        #print("Pridavam, sibling type: "+str(sibling._type)+" value:"+str(sibling._value)+" key:"+str(sibling.key),flush=True)
+        #print("Pridavam, parent type: "+str(parent._type)+" value:"+str(parent._value)+" key:"+str(parent.key),flush=True)
+        #print("Typ je:"+str(muj_typ))
 
-        if isinstance(parent.type(), dict):
-            print("Pridavam DICTIONARY",flush=True)
 
-        if isinstance(parent.type(), list):
-            print("Pridavam LIST",flush=True)
-
+        if key=="":
+            key=sibling.key+"1"
 
 
         child = QJsonTreeItem(parent)
-        child.key = sibling.key+"1"
+        child.key = key
         child.value=sibling.value
         child.type = muj_typ
         parent.appendChild(child)
@@ -363,8 +360,8 @@ class QJsonModel(QtCore.QAbstractItemModel):
         self._rootItem.add_child(parent,int)
         self.refresh();
 
-    def appendItem(self,parent,type):
-        self._rootItem.add_item("","novy_klic",parent,type)
+    def appendItem(self,parent,type,key="",value="novy_klic"):
+        self._rootItem.add_item(key,value,parent,type)
         self.refresh();
 
 
@@ -421,7 +418,7 @@ class JsonWidget(QtWidgets.QWidget):
             print("Double clicked",flush=True)
 
     def openMenu(self, position):
-        print("menu:"+str(position),flush=True)
+        #print("menu:"+str(position),flush=True)
 
         selected_item = self.treeView.indexAt(position)
         if not selected_item.isValid():
@@ -430,7 +427,6 @@ class JsonWidget(QtWidgets.QWidget):
 
 
         selected_type=selected_item.internalPointer().type()
-
 
         menu = QMenu()
         menu.addAction(self.tr("Add int"),self.add_int_item)
@@ -452,11 +448,11 @@ class JsonWidget(QtWidgets.QWidget):
             level=level+1
         return level
 
-    def add_item(self,type):
+    def add_item(self,type,key="",value="",):
         selected_index=self.treeView.selectedIndexes()
         if len(selected_index) <= 0:
             raise Exception('Row not selected')
-        self.model.appendItem(selected_index[0].internalPointer(),type)
+        self.model.appendItem(selected_index[0].internalPointer(),type,key,value)
 
     def add_child_item(self):
         selected_index=self.treeView.selectedIndexes()
