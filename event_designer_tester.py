@@ -13,9 +13,13 @@ class Event_Tester(JsonWidget):
         self.layout.addWidget(self.test_btn)
 
 
+        self.treeView.expandAll()
 
 
-    def add_item(self,type):
+
+
+
+    def add_item(self,type,key="",value="",child=False):
         selected_index=self.treeView.selectedIndexes()
         if len(selected_index) <= 0:
             raise Exception('Row not selected: '+str(len(selected_index)))
@@ -24,13 +28,7 @@ class Event_Tester(JsonWidget):
         item=selected_index[0].internalPointer()
 
 
-        #level 0 musí byt vzdy tests
-        if level == 0 :
-            return
-
-
-        #LEVEL 1 je pouze LIST -seznam testu
-        if level==1:
+        if level==0:
             if type != list:
                 print("v levelu "+str(level)+" muzu pridat pouzel list nikoliv "+str(type),flush=True)
                 return
@@ -40,10 +38,8 @@ class Event_Tester(JsonWidget):
                 super(Event_Tester,self).add_item(type,key=key)
 
 
-
-
-        #LEVEL 2 je pouze DICT -seznam prikazu pro test
-        if level==2:
+        #LEVEL 2 je pouze DICT -seznam prikazu pro test (pridavam potomkovi takze oznacen mam parent (to jelevel 1-) > se prida do levelu 2)
+        if level==1:
             if type != dict:
                 print("v levelu "+str(level)+" muzu pridat pouzel dict nikoliv "+str(type),flush=True)
                 return
@@ -52,57 +48,112 @@ class Event_Tester(JsonWidget):
 
 
         #LEVEL 3 jsou testy - typ testu je povinny parametr
-        if level==3:
-            items = ("set","dbset","test")
-            val=self.getChoice(items,"type")
-            print("Pridavam "+val,flush=True)
-            super(Event_Tester,self).add_item(type,key="typ",value=val)
-
-
+        if level==2:
+            if item.childCount() == 0:
+                items = ("set","db_set","test")
+                val=self.getChoice(items,"type")
+                print("Pridavam "+val,flush=True)
+                super(Event_Tester,self).add_item(type,key="typ",value=val)
+            else:
+                super(Event_Tester,self).add_item(type,key=key,value=value)
 
         print("addd at level:"+str(level),flush=True)
 
 
     def openMenu(self, position):
-       #print("menu:"+str(position),flush=True)
+        #print("menu:"+str(position),flush=True)
 
-       selected_item = self.treeView.indexAt(position)
-       if not selected_item.isValid():
-           print("no selected",flush=True)
-           return
-
-
-       selected_type=selected_item.internalPointer().type()
-       level=self.get_item_level(selected_item)
+        selected_item = self.treeView.indexAt(position)
+        if not selected_item.isValid():
+            print("no selected",flush=True)
+            return
 
 
-       menu = QMenu()
-
-       if level==0:
-           return
-
-       if level==1:
-           menu.addAction(self.tr("Add new test"),self.add_list_item)
-           menu.addAction(self.tr("Add tests unit"),self.add_child_item)
-
-       if level==2:
-           menu.addAction(self.tr("Add dict"),self.add_dict_item)
-           menu.addAction(self.tr("Add child"),self.add_child_item)
+        selected_type=selected_item.internalPointer().type()
+        level=self.get_item_level(selected_item)
+        item=selected_item.internalPointer()
 
 
-       if level==3:
-           menu.addAction(self.tr("Add int"),self.add_int_item)
-           menu.addAction(self.tr("Add str"),self.add_str_item)
-           menu.addAction(self.tr("Add list"),self.add_list_item)
-           menu.addAction(self.tr("Add dict"),self.add_dict_item)
-           if isinstance(selected_type,list) or isinstance(selected_type,dict):
-               menu.addAction(self.tr("Add child"),self.add_child_item)
+        menu = QMenu()
+
+        if level==0:
+           menu.addAction(self.tr("Add new test"),self.add_child_list_item)
 
 
-       menu.addAction(self.tr("Remove item"),self.remove_item)
+        if level==1:
+           menu.addAction(self.tr("Add tests unit"),self.add_child_dict_item)
 
-       menu.exec_(self.treeView.viewport().mapToGlobal(position))
 
+
+
+        if level==2:
+            if item.childCount() == 0:
+                menu.addAction(self.tr("Add new type"),self.add_child_str_item)
+            else:
+                typ=""
+                for i in range(0,item.childCount()):
+                    if item.child(i).key == "typ":
+                        typ=item.child(i).value
+                if typ=="db_set":
+                    menu.addAction(self.tr("Add DB string"),self.add_child_str_item)
+                elif typ=="set":
+                    menu.addAction(self.tr("Add property GPS delta"),self.input_set_GPS_delta)
+                    menu.addAction(self.tr("Add property GPS valid"),self.input_set_GPS_valid)
+                    menu.addAction(self.tr("Add property Tacho abs"),self.input_set_Tacho_abs)
+                    menu.addAction(self.tr("Add property Tacho plus"),self.input_set_Tacho)
+                    menu.addAction(self.tr("Add property Door"),self.input_set_Door)
+                    menu.addAction(self.tr("Add property Sleep"),self.input_set_Sleep)
+                    menu.addAction(self.tr("Add property Variable"),self.input_set_Variable)
+                elif typ=="test":
+                    menu.addAction(self.tr("Add propertyxxxxxxx"),self.input_set_GPS_delta)
+
+
+        menu.addAction(self.tr("Remove item"),self.remove_item)
+        menu.exec_(self.treeView.viewport().mapToGlobal(position))
+
+
+
+#####################UNIT TEST - SET##############################################
+
+    def input_set_GPS_delta(self):
+        val=self.getInteger("GPS delta:")
+        self.add_item(type=int,key="GPS_delta",value=val,child=True)
+
+    def input_set_GPS_valid(self):
+        val=self.getBool("GPS valid:")
+        self.add_item(type=int,key="GPS_valid",value=val,child=True)
+
+    def input_set_Tacho_abs(self):
+        val=self.getInteger("Tacho_abs:",min=0)
+        self.add_item(type=int,key="Tacho_abs",value=val,child=True)
+
+    def input_set_Tacho(self):
+        val=self.getInteger("Tacho delta:")
+        self.add_item(type=int,key="Tacho",value=val,child=True)
+
+    def input_set_Door(self):
+        val=self.getBool("Door")
+        self.add_item(type=int,key="Door",value=val,child=True)
+
+    def input_set_Sleep(self):
+        val=self.getDouble("Sleep [s] (double):",min=0,max=30)
+        self.add_item(type=int,key="GPS_delta",value=val,child=True)
+
+    def input_set_Variable(self):
+        val=self.getInteger("NOT JET IMPLEMENT:",min=0,max=1)
+        self.add_item(type=int,key="GPS_delta",value=val,child=True)
+
+
+
+#####################UNIT TEST - TEST ##############################################
+    def input_test_Variable(self):
+        print("Not implement",flush=True)
+
+
+
+
+
+#####################INPUT FUNCTION##############################################
 
     def getText(self):
         text, okPressed = QInputDialog.getText(self, "Get text","Your name:", QLineEdit.Normal, "")
@@ -114,6 +165,20 @@ class Event_Tester(JsonWidget):
         item, okPressed = QInputDialog.getItem(self, "Get item",prompt_name, items, 0, False)
         return item
 
+    def getInteger(self,prompt_name="",min=-9999999,max=99999999):
+        i, okPressed = QInputDialog.getInt(self, "Get integer",prompt_name, 0,min,max, 1)
+        if okPressed:
+            return i
+        return 0
+
+    def getDouble(self,prompt_name="",min=0,max=999):
+        d, okPressed = QInputDialog.getDouble(self, "Get double",prompt_name, 0, min,max , 10)#The last parameter (10) is the number of decimals behind the comma.
+        if okPressed:
+            return d;
+        return 0
+
+    def getBool(self,prompt_name=""):
+        return self.getInteger(prompt_name,min=0,max=1)
 
 
 if __name__ == '__main__':

@@ -148,19 +148,11 @@ class QJsonTreeItem(object):
         parent.appendChild(child)
 
 
-    def add_item(self,key,value,sibling,muj_typ):
-        parent=sibling.parent()
+    def add_item(self,key,value,parent,muj_typ):
 
         #print("Pridavam, sibling type: "+str(sibling._type)+" value:"+str(sibling._value)+" key:"+str(sibling.key),flush=True)
         #print("Pridavam, parent type: "+str(parent._type)+" value:"+str(parent._value)+" key:"+str(parent.key),flush=True)
         #print("Typ je:"+str(muj_typ))
-
-
-        if key=="":
-            key=sibling.key+"1"
-        if value=="":
-            value=sibling.value
-
 
         child = QJsonTreeItem(parent)
         child.key = key
@@ -329,8 +321,20 @@ class QJsonModel(QtCore.QAbstractItemModel):
     def columnCount(self, parent=QtCore.QModelIndex()):
         return 3
 
+
+    def dropMimeData(self, data, action, row, column, parent):
+        print("DROPING r:"+str(row)+" c:"+str(column)+" text:"+str(parent.internalPointer().value),flush=True)
+        if action == QtCore.Qt.IgnoreAction:
+            return True
+
+        return False
+
+    def supportedDropActions(self):
+        return Qt.MoveAction;
+
     def flags(self, index):
         flags = super(QJsonModel, self).flags(index)
+        #flags=flags | QtCore.Qt.ItemIsDragEnabled | QtCore.Qt.ItemIsDropEnabled
         if index.column() == 1:
             return QtCore.Qt.ItemIsEditable | flags
         elif index.column() == 0:
@@ -388,6 +392,22 @@ class JsonWidget(QtWidgets.QWidget):
         self.treeView = QtWidgets.QTreeView()
         self.model = QJsonModel()
         self.treeView.setModel(self.model)
+
+
+        ##DRAG and DROP neni implementovano v modelu
+        #self.treeView.setDragDropMode(QAbstractItemView.InternalMove);
+        #self.treeView.setSelectionMode(QAbstractItemView.ExtendedSelection);
+        #self.treeView.setDragEnabled(True);
+        #self.treeView.setAcceptDrops(True);
+        #self.treeView.setDropIndicatorShown(True);
+
+
+
+        header = self.treeView.header()
+        header.setSectionResizeMode(QtWidgets.QHeaderView.ResizeToContents)
+        header.setStretchLastSection(False)
+        header.setSectionResizeMode(1, QtWidgets.QHeaderView.Stretch)
+
 
         with open(JSON_FILE) as f:
             document = json.load(f)
@@ -450,17 +470,15 @@ class JsonWidget(QtWidgets.QWidget):
             level=level+1
         return level
 
-    def add_item(self,type,key="",value="",):
+    def add_item(self,type,key="",value="",child=False):
         selected_index=self.treeView.selectedIndexes()
         if len(selected_index) <= 0:
             raise Exception('Row not selected')
-        self.model.appendItem(selected_index[0].internalPointer(),type,key,value)
+        item=selected_index[0].internalPointer()
+        if child:
+            item=item.parent()
+        self.model.appendItem(item,type,key,value)
 
-    def add_child_item(self):
-        selected_index=self.treeView.selectedIndexes()
-        if len(selected_index) <= 0:
-            raise Exception('Row not selected')
-        self.model.appendChild(selected_index[0].internalPointer())
 
     def remove_item(self):
         selected_index=self.treeView.selectedIndexes()
@@ -482,6 +500,17 @@ class JsonWidget(QtWidgets.QWidget):
         self.add_item(dict)
 
 
+    def add_child_int_item(self):
+         self.add_item(int,child=True)
+
+    def add_child_str_item(self):
+        self.add_item(str,child=True)
+
+    def add_child_list_item(self):
+        self.add_item(list,child=True)
+
+    def add_child_dict_item(self):
+        self.add_item(dict,child=True)
 
 
 if __name__ == '__main__':
