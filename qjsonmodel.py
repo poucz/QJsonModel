@@ -329,15 +329,26 @@ class QJsonModel(QtCore.QAbstractItemModel):
 
         return False
 
+
+    def moveRows(self, parent, source_first, source_last, parent2, dest):
+        print("MOVE ROWS!",flush=True)
+
     def supportedDropActions(self):
         return Qt.MoveAction;
 
+    def supportedDragActions(self):
+        return Qt.MoveAction
+
+    def supportedDropActions(self):
+        return Qt.MoveAction
+
     def flags(self, index):
         flags = super(QJsonModel, self).flags(index)
-        #flags=flags | QtCore.Qt.ItemIsDragEnabled | QtCore.Qt.ItemIsDropEnabled
+
         if index.column() == 1:
             return QtCore.Qt.ItemIsEditable | flags
         elif index.column() == 0:
+            flags=flags | QtCore.Qt.ItemIsDragEnabled | QtCore.Qt.ItemIsDropEnabled
             return QtCore.Qt.ItemIsEditable | flags
         else:
             return flags
@@ -362,13 +373,11 @@ class QJsonModel(QtCore.QAbstractItemModel):
         else:
             return item.value
 
-    def appendChild(self,parent):
-        self._rootItem.add_child(parent,int)
-        self.refresh();
-
     def appendItem(self,parent,type,key="",value="novy_klic"):
-        self._rootItem.add_item(key,value,parent,type)
-        self.refresh();
+        self.beginInsertRows(parent,parent.row(),parent.row())
+        self._rootItem.add_item(key,value,parent.internalPointer(),type)
+        #self.refresh();
+        self.endInsertRows()
 
 
     def removeItem(self,item):
@@ -395,11 +404,12 @@ class JsonWidget(QtWidgets.QWidget):
 
 
         ##DRAG and DROP neni implementovano v modelu
-        #self.treeView.setDragDropMode(QAbstractItemView.InternalMove);
+        self.treeView.setDragDropMode(QAbstractItemView.InternalMove);
         #self.treeView.setSelectionMode(QAbstractItemView.ExtendedSelection);
-        #self.treeView.setDragEnabled(True);
+        self.treeView.setDragEnabled(True);
         #self.treeView.setAcceptDrops(True);
         #self.treeView.setDropIndicatorShown(True);
+
 
 
 
@@ -474,7 +484,7 @@ class JsonWidget(QtWidgets.QWidget):
         selected_index=self.treeView.selectedIndexes()
         if len(selected_index) <= 0:
             raise Exception('Row not selected')
-        item=selected_index[0].internalPointer()
+        item=selected_index[0]
         if child:
             item=item.parent()
         self.model.appendItem(item,type,key,value)
