@@ -158,11 +158,13 @@ class QJsonTreeItem(object):
 
         if key=="":
             key=sibling.key+"1"
+        if value=="":
+            value=sibling.value
 
 
         child = QJsonTreeItem(parent)
         child.key = key
-        child.value=sibling.value
+        child.value=value
         child.type = muj_typ
         parent.appendChild(child)
 
