@@ -40,8 +40,23 @@ Changes:
 import json
 
 from Qt import QtWidgets, QtCore, __binding__
-#from PySide2 import *
-#from PySide2.QtWidgets import *
+
+from PySide2.QtWidgets import QApplication, QPushButton, QWidget
+from PySide2.QtGui import Qt
+
+
+####vymazat
+from PySide2 import *
+from PySide2.QtGui import *
+from PySide2.QtWidgets import *
+#from Qt import *
+
+
+
+
+JSON_FILE="/home/pou/pyside2_python_qml/QJsonModel/asf.json"
+
+
 
 
 class QJsonTreeItem(object):
@@ -125,13 +140,47 @@ class QJsonTreeItem(object):
 
         return rootItem
 
+    def add_child(self,parent,muj_typ):
+        child = QJsonTreeItem(parent)
+        child.key = "x"
+        child.value=1
+        child.type = muj_typ
+        parent.appendChild(child)
+
+
+    def add_item(self,value,key,sibling,muj_typ):
+        parent=sibling.parent()
+
+        print("Pridavam, sibling type: "+str(sibling._type)+" value:"+str(sibling._value)+" key:"+str(sibling.key),flush=True)
+        print("Pridavam, parent type: "+str(parent._type)+" value:"+str(parent._value)+" key:"+str(parent.key),flush=True)
+        print("Typ je:"+str(muj_typ))
+
+        if isinstance(parent.type(), dict):
+            print("Pridavam DICTIONARY",flush=True)
+
+        if isinstance(parent.type(), list):
+            print("Pridavam LIST",flush=True)
+
+
+
+        child = QJsonTreeItem(parent)
+        child.key = sibling.key+"1"
+        child.value=sibling.value
+        child.type = muj_typ
+        parent.appendChild(child)
+
+
+    def remove_item(self,item):
+        parent=item.parent()
+        parent._children.remove(item)
+
 
 class QJsonModel(QtCore.QAbstractItemModel):
     def __init__(self, parent=None):
         super(QJsonModel, self).__init__(parent)
 
         self._rootItem = QJsonTreeItem()
-        self._headers = ("key", "value")
+        self._headers = ("key", "value","typ")
 
     def load(self, document):
         """Load from dictionary
@@ -178,10 +227,15 @@ class QJsonModel(QtCore.QAbstractItemModel):
 
         if role == QtCore.Qt.DisplayRole:
             if index.column() == 0:
+                if isinstance(item.parent().type(),list):
+                    return str(index.row())
                 return item.key
 
             if index.column() == 1:
                 return item.value
+
+            if index.column() == 2:
+                return str(item.type)
 
         elif role == QtCore.Qt.EditRole:
             if index.column() == 1:
@@ -189,18 +243,44 @@ class QJsonModel(QtCore.QAbstractItemModel):
 
     def setData(self, index, value, role):
         if role == QtCore.Qt.EditRole:
-            print("Editing... val:"+value,flush=True)
             if index.column() == 1:
                 item = index.internalPointer()
-                item.value = str(value)
+
+                if isinstance(item.type(), int):
+                    try:
+                        item.value=int(value)
+                    except ValueError:
+                        return False
+                else:
+                    item.value = str(value)
+
 
                 if __binding__ in ("PySide", "PyQt4"):
                     self.dataChanged.emit(index, index)
                 else:
                     self.dataChanged.emit(index, index, [QtCore.Qt.EditRole])
-
+                return True
+            if index.column() ==0 : #editace klice
+                item = index.internalPointer()
+                if isinstance(item.parent().type(),list): ##tady nemuzu menit kdy, je to index
+                    return False
+                if not self.validateKey(item,value):
+                    return False
+                item.key = str(value)
+                if __binding__ in ("PySide", "PyQt4"):
+                    self.dataChanged.emit(index, index)
+                else:
+                    self.dataChanged.emit(index, index, [QtCore.Qt.EditRole])
                 return True
         return False
+
+    def validateKey(self,item,new_key):
+        parent=item.parent()
+        for i in range(parent.childCount()):
+            if parent.child(i).key == new_key:
+                return False
+        return True
+
 
     def headerData(self, section, orientation, role):
         if role != QtCore.Qt.DisplayRole:
@@ -248,12 +328,13 @@ class QJsonModel(QtCore.QAbstractItemModel):
         return parentItem.childCount()
 
     def columnCount(self, parent=QtCore.QModelIndex()):
-        return 2
+        return 3
 
     def flags(self, index):
         flags = super(QJsonModel, self).flags(index)
-
         if index.column() == 1:
+            return QtCore.Qt.ItemIsEditable | flags
+        elif index.column() == 0:
             return QtCore.Qt.ItemIsEditable | flags
         else:
             return flags
@@ -278,56 +359,146 @@ class QJsonModel(QtCore.QAbstractItemModel):
         else:
             return item.value
 
+    def appendChild(self,parent):
+        self._rootItem.add_child(parent,int)
+        self.refresh();
+
+    def appendItem(self,parent,type):
+        self._rootItem.add_item("","novy_klic",parent,type)
+        self.refresh();
+
+
+    def removeItem(self,item):
+        self.beginRemoveRows(item.parent(),item.row(),item.row()+1)
+        self._rootItem.remove_item(item.internalPointer())
+        self.endRemoveRows()
+
+
+    def refresh(self):
+        if __binding__ in ("PySide", "PyQt4"):
+            self.layoutChanged.emit()
+        else:
+            self.layoutChanged.emit()
+            #self.dataChanged.emit(index, index, [QtCore.Qt.EditRole])
+
+class JsonWidget(QtWidgets.QWidget):
+    def __init__(self):
+        QtWidgets.QWidget.__init__(self)
+
+        self.button = QtWidgets.QPushButton("Save")
+        self.treeView = QtWidgets.QTreeView()
+        self.model = QJsonModel()
+        self.treeView.setModel(self.model)
+
+        with open(JSON_FILE) as f:
+            document = json.load(f)
+            self.model.load(document)
+
+        self.button.clicked.connect(self.Save_to_file)
+
+        self.layout = QtWidgets.QVBoxLayout()
+        self.layout.addWidget(self.treeView)
+        self.layout.addWidget(self.button)
+        self.setLayout(self.layout)
+
+        #self.treeView.doubleClicked.connect(self.on_doubleClicked)
+        self.treeView.setContextMenuPolicy(Qt.CustomContextMenu)
+        self.treeView.customContextMenuRequested.connect(self.openMenu)
+
+
+    def Save_to_file(self):
+        data=self.model.json()
+        print("Saving....",flush=True)
+        #print(data,flush=True)
+        with open(JSON_FILE, 'w') as f:
+            json.dump(data, f)
+
+
+
+    @QtCore.Slot("QModelIndex")
+    def on_doubleClicked(self, ix):
+            #print(ix.data())
+            print("Double clicked",flush=True)
+
+    def openMenu(self, position):
+        print("menu:"+str(position),flush=True)
+
+        selected_item = self.treeView.indexAt(position)
+        if not selected_item.isValid():
+            print("no selected",flush=True)
+            return
+
+
+        selected_type=selected_item.internalPointer().type()
+
+
+        menu = QMenu()
+        menu.addAction(self.tr("Add int"),self.add_int_item)
+        menu.addAction(self.tr("Add str"),self.add_str_item)
+        menu.addAction(self.tr("Add list"),self.add_list_item)
+        menu.addAction(self.tr("Add dict"),self.add_dict_item)
+        if isinstance(selected_type,list) or isinstance(selected_type,dict):
+            menu.addAction(self.tr("Add child"),self.add_child_item)
+        menu.addAction(self.tr("Remove item"),self.remove_item)
+
+        menu.exec_(self.treeView.viewport().mapToGlobal(position))
+
+
+    def add_item(self,type):
+        selected_index=self.treeView.selectedIndexes()
+        if len(selected_index) <= 0:
+            raise Exception('Row not selected')
+        self.model.appendItem(selected_index[0].internalPointer(),type)
+
+    def add_child_item(self):
+        selected_index=self.treeView.selectedIndexes()
+        if len(selected_index) <= 0:
+            raise Exception('Row not selected')
+        self.model.appendChild(selected_index[0].internalPointer())
+
+    def remove_item(self):
+        selected_index=self.treeView.selectedIndexes()
+        if len(selected_index) <= 0:
+            raise Exception('Row not selected')
+        self.model.removeItem(selected_index[0])
+
+
+    def add_int_item(self):
+        self.add_item(int)
+
+    def add_str_item(self):
+        self.add_item(str)
+
+    def add_list_item(self):
+        self.add_item(list)
+
+    def add_dict_item(self):
+        self.add_item(dict)
+
+
+
 
 if __name__ == '__main__':
     import sys
 
     app = QtWidgets.QApplication(sys.argv)
-    view = QtWidgets.QTreeView()
-    model = QJsonModel()
-
-    view.setModel(model)
-
-    document = json.loads("""\
-    {
-        "firstName": "John",
-        "lastName": "Smith",
-        "age": 25,
-        "address": {
-            "streetAddress": "21 2nd Street",
-            "city": "New York",
-            "state": "NY",
-            "postalCode": "10021"
-        },
-        "phoneNumber": [
-            {
-                "type": "home",
-                "number": "212 555-1234"
-            },
-            {
-                "type": "fax",
-                "number": "646 555-4567"
-            }
-        ]
-    }
-    """)
-
-
-    with open("test.csv") as f:
-                  document = json.load(f)
-                  model.load(document)
-
+    window = QWidget()
 
     #model.load(document)
     #model.clear()
     #model.load(document)
 
     # Sanity check
-    assert (
-        json.dumps(model.json(), sort_keys=True) ==
-        json.dumps(document, sort_keys=True)
-    )
+    #assert (
+    #    json.dumps(model.json(), sort_keys=True) ==
+    #    json.dumps(document, sort_keys=True)
+    #)
 
-    view.show()
-    view.resize(500, 300)
+    layout = QtWidgets.QVBoxLayout()
+    jsonwidget= JsonWidget();
+
+    layout.addWidget(jsonwidget)
+    window.setLayout(layout)
+    window.show()
+    window.resize(500, 300)
     app.exec_()
