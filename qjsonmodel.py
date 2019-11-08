@@ -38,7 +38,7 @@ Changes:
 """
 
 import json
-
+import ctypes
 from Qt import QtWidgets, QtCore, __binding__
 
 from PySide2.QtWidgets import QApplication, QPushButton, QWidget
@@ -172,6 +172,7 @@ class QJsonModel(QtCore.QAbstractItemModel):
 
         self._rootItem = QJsonTreeItem()
         self._headers = ("key", "value","typ")
+        self._dragFrom=None
 
     def load(self, document):
         """Load from dictionary
@@ -321,25 +322,56 @@ class QJsonModel(QtCore.QAbstractItemModel):
     def columnCount(self, parent=QtCore.QModelIndex()):
         return 3
 
+    def mimeTypes(self):
+        """
+        Only accept the internal custom drop type which is plain text
+        """
+        return [ "application/pou.cz" ]
+
+
+    def mimeData(self, indices):
+        #print("Generate mime Data - len:"+str(len(indices)),flush=True)
+        mimeData      = QtCore.QMimeData()
+        encodedData = QtCore.QByteArray()
+
+        if len(indices) != 1:
+            return None
+
+        stream = QtCore.QDataStream(encodedData, QtCore.QIODevice.WriteOnly)
+        index=indices[0]
+        item = index.internalPointer()
+
+        #data=str(id(item))#ukazatel
+        data="AHOJ"
+        self._dragFrom=index
+        mimeData.setData("application/pou.cz", bytes(data, 'utf-8'))
+        mimeData.setText(data)
+        return mimeData
+
 
     def dropMimeData(self, data, action, row, column, parent):
-        print("DROPING r:"+str(row)+" c:"+str(column)+" text:"+str(parent.internalPointer().value),flush=True)
-        if action == QtCore.Qt.IgnoreAction:
-            return True
+        """Nejdriv jsem do MIME dat chtel ulozit ukazatel na QJsonTreeItem
+        (QAbstracItemINDEX jsem nemohl ulozit protoze obejkt zanikne hned za funkci mimeData() )
+        to jako funguje dobre - musim samozrejmne zarucit ze ukazatel bude platny,
+        ale pro bezpecnost kodu jsem se rozhodl vyuzit k tomuto globalni funkci _dragFrom - ktera reprezentuje onen QAbstracItemINDEX
+        toto by melo byt bezpecnejsi a cistci - i kdyz prihlednu k dedeni"""
 
+        #item_src=ctypes.cast(int(data.text()), ctypes.py_object).value
+        item_src=parent_test=self._dragFrom.internalPointer()
+        parent_src=item_src.parent()
+
+        parent=parent.internalPointer()
+
+        #print("DROPING r:"+str(row)+" c:"+str(column)+" to:"+str(parent_src.row())+" action:"+str(action),flush=True)
+        #print("DROP: from:"+str(parent_src._children.index(item_src)),flush=True)
+        print("Parent1: "+str(id(parent_src))+" parent2: "+str(id(parent))+" paretn3: "+str(id(parent_test)),flush=True)
         return False
 
-
-    def moveRows(self, parent, source_first, source_last, parent2, dest):
-        print("MOVE ROWS!",flush=True)
 
     def supportedDropActions(self):
         return Qt.MoveAction;
 
     def supportedDragActions(self):
-        return Qt.MoveAction
-
-    def supportedDropActions(self):
         return Qt.MoveAction
 
     def flags(self, index):
@@ -393,25 +425,31 @@ class QJsonModel(QtCore.QAbstractItemModel):
             self.layoutChanged.emit()
             #self.dataChanged.emit(index, index, [QtCore.Qt.EditRole])
 
+    def get_item_level(self,model_index):
+        level=0
+        parent=model_index.parent()
+        while parent.isValid() :
+            parent=parent.parent()
+            level=level+1
+        return level
+
+
 class JsonWidget(QtWidgets.QWidget):
     def __init__(self):
         QtWidgets.QWidget.__init__(self)
 
         self.button = QtWidgets.QPushButton("Save")
         self.treeView = QtWidgets.QTreeView()
-        self.model = QJsonModel()
+        self.model = self.Init_data_model()
         self.treeView.setModel(self.model)
 
 
         ##DRAG and DROP neni implementovano v modelu
         self.treeView.setDragDropMode(QAbstractItemView.InternalMove);
         #self.treeView.setSelectionMode(QAbstractItemView.ExtendedSelection);
-        self.treeView.setDragEnabled(True);
+        #self.treeView.setDragEnabled(True);
         #self.treeView.setAcceptDrops(True);
         #self.treeView.setDropIndicatorShown(True);
-
-
-
 
         header = self.treeView.header()
         header.setSectionResizeMode(QtWidgets.QHeaderView.ResizeToContents)
@@ -434,6 +472,8 @@ class JsonWidget(QtWidgets.QWidget):
         self.treeView.setContextMenuPolicy(Qt.CustomContextMenu)
         self.treeView.customContextMenuRequested.connect(self.openMenu)
 
+    def Init_data_model(self):
+        return QJsonModel()
 
     def Save_to_file(self):
         data=self.model.json()
@@ -471,14 +511,6 @@ class JsonWidget(QtWidgets.QWidget):
 
         menu.exec_(self.treeView.viewport().mapToGlobal(position))
 
-
-    def get_item_level(self,model_inex):
-        level=0
-        parent=model_inex.parent()
-        while parent.isValid() :
-            parent=parent.parent()
-            level=level+1
-        return level
 
     def add_item(self,type,key="",value="",child=False):
         selected_index=self.treeView.selectedIndexes()
