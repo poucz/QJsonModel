@@ -2,7 +2,42 @@ from qjsonmodel import *
 
 
 from PySide2.QtWidgets import *
+import copy
 
+
+class MYJsonModel(QJsonModel):
+
+    def dropMimeData(self, data, action, row, column, parent):
+        item_src=parent_test=self._dragFrom.internalPointer()
+        item_parent_src=item_src.parent()
+        item_parent=parent.internalPointer()
+
+
+        if action == QtCore.Qt.IgnoreAction:
+            return True
+
+        if id(item_parent_src) == id(item_parent): #pokud kopiruju ze stejnych parentu udelam operaci MOVE
+            print("DROP: from:"+str(item_parent_src._children.index(item_src))+" to:"+str(row),flush=True)
+            self.beginMoveRows(parent, self._dragFrom.row(), self._dragFrom.row(), parent, row);
+            item_parent._children.insert(row,item_parent_src._children.pop(item_parent_src._children.index(item_src)))
+            self.endMoveRows()
+            return True
+
+        else: #pokud se jedna o jine parenty, potom KOPIRUJ data, ale pouze pokud jsou parenti ze stejneho levelu
+            level_src=self.get_item_level(self._dragFrom)
+            level=self.get_item_level(parent)
+            print("Level :"+str(level_src)+" do levelu:"+str(level),flush=True)
+
+            if level_src == level:
+                self.beginInsertRows(parent,parent.row(),parent.row()+1)
+                grand_parent=item_parent.parent()
+                clone=copy.deepcopy(item_src)
+                clone._parent=grand_parent
+                grand_parent.appendChild(clone)
+                self.endInsertRows()
+                return True
+
+        return False
 
 
 class Event_Tester(JsonWidget):
@@ -16,6 +51,9 @@ class Event_Tester(JsonWidget):
         self.treeView.expandAll()
 
 
+    def Init_data_model(self):
+        return MYJsonModel()
+
 
 
 
@@ -24,7 +62,7 @@ class Event_Tester(JsonWidget):
         if len(selected_index) <= 0:
             raise Exception('Row not selected: '+str(len(selected_index)))
 
-        level=self.get_item_level(selected_index[0])
+        level=self.model.get_item_level(selected_index[0])
         item=selected_index[0].internalPointer()
 
 
@@ -70,7 +108,7 @@ class Event_Tester(JsonWidget):
 
 
         selected_type=selected_item.internalPointer().type()
-        level=self.get_item_level(selected_item)
+        level=self.model.get_item_level(selected_item)
         item=selected_item.internalPointer()
 
 
@@ -95,7 +133,7 @@ class Event_Tester(JsonWidget):
                     if item.child(i).key == "typ":
                         typ=item.child(i).value
                 if typ=="db_set":
-                    menu.addAction(self.tr("Add DB string"),self.add_child_str_item)
+                    menu.addAction(self.tr("Add DB string"),self.input_set_db_set)
                 elif typ=="set":
                     menu.addAction(self.tr("Add property GPS delta"),self.input_set_GPS_delta)
                     menu.addAction(self.tr("Add property GPS valid"),self.input_set_GPS_valid)
@@ -113,6 +151,10 @@ class Event_Tester(JsonWidget):
 
 
 
+#####################UNIT TEST - DB_SET##############################################
+    def input_set_db_set(self):
+        val=self.getText("DB string:")
+        self.add_item(type=int,key="Value",value=val,child=True)
 #####################UNIT TEST - SET##############################################
 
     def input_set_GPS_delta(self):
@@ -155,8 +197,8 @@ class Event_Tester(JsonWidget):
 
 #####################INPUT FUNCTION##############################################
 
-    def getText(self):
-        text, okPressed = QInputDialog.getText(self, "Get text","Your name:", QLineEdit.Normal, "")
+    def getText(self,prompt_name="text:"):
+        text, okPressed = QInputDialog.getText(self, "Get text",prompt_name, QLineEdit.Normal, "")
         if okPressed and text != '':
             return text
         return ""
