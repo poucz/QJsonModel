@@ -416,6 +416,11 @@ class QJsonModel(QtCore.QAbstractItemModel):
         self.endInsertRows()
 
 
+    def appendItem2(self,parent,item):
+        self.beginInsertRows(parent,parent.row(),parent.row())
+        parent.internalPointer().appendChild(item)
+        self.endInsertRows()
+
     def removeItem(self,item):
         self.beginRemoveRows(item.parent(),item.row(),item.row()+1)
         self._rootItem.remove_item(item.internalPointer())
