@@ -233,6 +233,10 @@ class QJsonModel(QtCore.QAbstractItemModel):
             if index.column() == 1:
                 return item.value
 
+        return None
+
+
+
     def setData(self, index, value, role):
         if role == QtCore.Qt.EditRole:
             if index.column() == 1:
@@ -369,10 +373,10 @@ class QJsonModel(QtCore.QAbstractItemModel):
 
 
     def supportedDropActions(self):
-        return Qt.MoveAction;
+        return Qt.MoveAction|Qt.CopyAction;
 
     def supportedDragActions(self):
-        return Qt.MoveAction
+        return Qt.MoveAction|Qt.CopyAction
 
     def flags(self, index):
         flags = super(QJsonModel, self).flags(index)
@@ -446,10 +450,10 @@ class JsonWidget(QtWidgets.QWidget):
 
         ##DRAG and DROP neni implementovano v modelu
         self.treeView.setDragDropMode(QAbstractItemView.InternalMove);
-        #self.treeView.setSelectionMode(QAbstractItemView.ExtendedSelection);
-        #self.treeView.setDragEnabled(True);
-        #self.treeView.setAcceptDrops(True);
-        #self.treeView.setDropIndicatorShown(True);
+        self.treeView.setSelectionMode(QAbstractItemView.ExtendedSelection);
+        self.treeView.setDragEnabled(True);
+        self.treeView.setAcceptDrops(True);
+        self.treeView.setDropIndicatorShown(True);
 
         header = self.treeView.header()
         header.setSectionResizeMode(QtWidgets.QHeaderView.ResizeToContents)

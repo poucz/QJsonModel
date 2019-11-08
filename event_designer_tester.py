@@ -6,18 +6,44 @@ import copy
 
 
 class MYJsonModel(QJsonModel):
+    def find_type(self,index):
+        item=index.internalPointer()
+        for i in range(0,item.childCount()):
+            if item.child(i).key == "typ":
+                typ=item.child(i).value
+                return typ
+
+
+    def data(self, index, role):
+
+
+        if role == QtCore.Qt.DecorationRole:
+            if index.column()==0:
+                typ=self.find_type(index)
+                if typ=="db_set":
+                    return QtGui.QColor(0,255,255);
+                if typ=="set":
+                    return QtGui.QColor(235,149,10);
+                if typ=="test":
+                    return QtGui.QColor(130,10,235);
+
+        return super(MYJsonModel,self).data(index,role)
+
+
+
 
     def dropMimeData(self, data, action, row, column, parent):
-        item_src=parent_test=self._dragFrom.internalPointer()
+        item_src=self._dragFrom.internalPointer()
         item_parent_src=item_src.parent()
         item_parent=parent.internalPointer()
-
 
         if action == QtCore.Qt.IgnoreAction:
             return True
 
         if id(item_parent_src) == id(item_parent): #pokud kopiruju ze stejnych parentu udelam operaci MOVE
             print("DROP: from:"+str(item_parent_src._children.index(item_src))+" to:"+str(row),flush=True)
+            if item_parent_src._children.index(item_src)  ==row : #dropnuti na stejne misto!
+                return False
             self.beginMoveRows(parent, self._dragFrom.row(), self._dragFrom.row(), parent, row);
             item_parent._children.insert(row,item_parent_src._children.pop(item_parent_src._children.index(item_src)))
             self.endMoveRows()
@@ -26,11 +52,9 @@ class MYJsonModel(QJsonModel):
         else: #pokud se jedna o jine parenty, potom KOPIRUJ data, ale pouze pokud jsou parenti ze stejneho levelu
             level_src=self.get_item_level(self._dragFrom)
             level=self.get_item_level(parent)
-            print("Level :"+str(level_src)+" do levelu:"+str(level),flush=True)
-
-            if level_src == level:
-                self.beginInsertRows(parent,parent.row(),parent.row()+1)
+            if level_src == level :
                 grand_parent=item_parent.parent()
+                self.beginInsertRows(parent.parent(),grand_parent.childCount(),grand_parent.childCount()+1)
                 clone=copy.deepcopy(item_src)
                 clone._parent=grand_parent
                 grand_parent.appendChild(clone)
@@ -132,6 +156,7 @@ class Event_Tester(JsonWidget):
                 for i in range(0,item.childCount()):
                     if item.child(i).key == "typ":
                         typ=item.child(i).value
+                find_type=self.model.find_type(selected_item)
                 if typ=="db_set":
                     menu.addAction(self.tr("Add DB string"),self.input_set_db_set)
                 elif typ=="set":
@@ -235,5 +260,5 @@ if __name__ == '__main__':
     layout.addWidget(jsonwidget)
     window.setLayout(layout)
     window.show()
-    window.resize(600, 400)
+    window.resize(800, 600)
     app.exec_()
